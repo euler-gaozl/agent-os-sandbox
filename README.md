@@ -49,3 +49,10 @@ migrate the given DB. Without it they explicitly skip. Boundary tests use an
 HTTP Runtime fixture, not a full Runtime. Existing whole-platform Docker crash
 tests remain in the integration repository until separately ported/accepted;
 broker compilation is not proof that isolated execution passed.
+
+Legacy local configurations may omit the Runtime address: this service preserves
+the previous loopback default (127.0.0.1:8094) for its bounded heartbeat/client.
+Where used, Registry (8096) and ToolHub (8091) defaults are also owned by the
+service entrypoint. Explicit environment/config endpoints always take precedence.
+Configure these addresses explicitly for containers or multiple hosts. No config
+file or shared SDK role policy is rewritten by this compatibility behavior.
