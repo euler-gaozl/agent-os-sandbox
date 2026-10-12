@@ -1,0 +1,10 @@
+{
+  "LISTEN": "127.0.0.1:8093",
+  "DATABASE_URL": "<application role connection>",
+  "SERVICE_TOKEN": "<generate 32+ random bytes>",
+  "SERVICE_PEERS": "<JSON object: role to SHA-256 of peer token>",
+  "DB_MAX_CONNS": "3",
+  "GOMEMLIMIT": "96MiB",
+  "RUNTIME_URL": "http://127.0.0.1:8094",
+  "SANDBOX_IMAGE": ""
+}
