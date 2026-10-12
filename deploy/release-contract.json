@@ -2,8 +2,12 @@
   "schema": "public",
   "backward_compatible": true,
   "role": "sandbox",
-  "http_contract": "agentos-http-v0.6-notes-lifecycle",
   "migration_owner": "sandbox",
   "format": 1,
-  "data_contract": "sandbox-v0.6-independent"
+  "contract": {
+    "http": "agentos-http-v0.6-notes-lifecycle",
+    "engines": [],
+    "data": "sandbox-v0.6-independent",
+    "tools": []
+  }
 }
