@@ -50,6 +50,24 @@ HTTP Runtime fixture, not a full Runtime. Existing whole-platform Docker crash
 tests remain in the integration repository until separately ported/accepted;
 broker compilation is not proof that isolated execution passed.
 
+`sandbox/docker_integration_test.go` now retains the real Docker isolation,
+replay, broker subprocess kill, independent guard deadline and orphan receipt
+recovery scenarios in this owner. It uses its own disposable database and
+restricted login; Runtime authorization is an explicit HTTP fixture. Run with
+`TEST_DOCKER_SANDBOX=1`, a dedicated `DOCKER_HOST`, a digest-pinned
+`SANDBOX_IMAGE` and fixture `TEST_DATABASE_URL`. The opt-in `isolation.yml`
+workflow provides that daemon and builds this repository's guard. It has no
+push/PR trigger. This new owner Docker workflow has not yet run; the historical
+monorepo test remains until final unified Linux acceptance. Local fixture
+identity/authorization checks do not establish Docker execution on Windows.
+
+Local proof `p2-owner-coverage-58d357e0cd7b4e71bb4ea51cf7661743` passed
+three targeted authorization/restricted-login checks with real PostgreSQL and
+zero skips; the Linux test binary also cross-compiled. The transferred Docker
+test now requires an actual SIGKILL wait status and stops/waits for the broker
+before removing the container on failure. Static review identified those gaps
+in the inherited test. Actual Docker execution remains pending.
+
 Legacy local configurations may omit the Runtime address: this service preserves
 the previous loopback default (127.0.0.1:8094) for its bounded heartbeat/client.
 Where used, Registry (8096) and ToolHub (8091) defaults are also owned by the

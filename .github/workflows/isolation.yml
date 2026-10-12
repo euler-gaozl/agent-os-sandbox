@@ -1,0 +1,55 @@
+name: Sandbox isolated execution acceptance
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GOWORK: 'off'
+      GOPROXY: 'off'
+      TEST_DATABASE_URL: postgres://fixture:fixture-only@127.0.0.1:5432/postgres?sslmode=disable
+    services:
+      postgres:
+        image: postgres:18
+        env: {POSTGRES_USER: fixture, POSTGRES_PASSWORD: fixture-only, POSTGRES_DB: postgres}
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U fixture" --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: 1.27.2, cache: false}
+      - name: Build workload on a dedicated disposable daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .state/isolation-evidence
+          docker run -d --name sandbox-test-dind --privileged -p 127.0.0.1:12375:2375 -e DOCKER_TLS_CERTDIR= docker:28-dind --tls=false
+          for i in $(seq 1 60); do docker -H tcp://127.0.0.1:12375 info >/dev/null 2>&1 && break; sleep 1; done
+          docker -H tcp://127.0.0.1:12375 info >/dev/null
+          docker -H tcp://127.0.0.1:12375 pull node:24-alpine
+          BASE=$(docker -H tcp://127.0.0.1:12375 image inspect node:24-alpine --format '{{index .RepoDigests 0}}')
+          docker -H tcp://127.0.0.1:12375 build -f deploy/sandbox-runtime.Dockerfile --build-arg NODE_BASE="$BASE" -t sandbox-workload:acceptance .
+          IMAGE=$(docker -H tcp://127.0.0.1:12375 image inspect sandbox-workload:acceptance --format '{{.Id}}')
+          printf '%s\n%s\n' "$BASE" "$IMAGE" > .state/isolation-evidence/images.txt
+          echo "SANDBOX_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo 'DOCKER_HOST=tcp://127.0.0.1:12375' >> "$GITHUB_ENV"
+          echo 'TEST_DOCKER_SANDBOX=1' >> "$GITHUB_ENV"
+      - name: Verify real isolation and broker process death
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -mod=vendor -race -count=1 -timeout=3m -json ./sandbox -run '^TestDockerSandboxIsolationReplayAndBrokerCrash$' | tee .state/isolation-evidence/test.jsonl
+          jq -se 'any(.[]; .Action == "pass" and .Test == "TestDockerSandboxIsolationReplayAndBrokerCrash") and (all(.[]; .Action != "skip"))' .state/isolation-evidence/test.jsonl
+      - name: Retain daemon diagnostics
+        if: always()
+        run: env -u DOCKER_HOST docker logs --tail 100 sandbox-test-dind > .state/isolation-evidence/daemon.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: sandbox-isolation, path: '.state/isolation-evidence/'}
+      - name: Dispose only the test daemon
+        if: always()
+        run: env -u DOCKER_HOST docker rm -f -v sandbox-test-dind
